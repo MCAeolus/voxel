@@ -16,6 +16,9 @@ pub struct State {
     is_surface_configured: bool,
     window: Arc<Window>,
     bg_color: wgpu::Color,
+
+    //pipeline
+    render_pipeline: wgpu::RenderPipeline,
 }
 
 impl State {
@@ -79,6 +82,52 @@ impl State {
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
         };
+        let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[],
+                immediate_size: 0,
+            });
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[], // what vertices to pass to vertex shader -> specified in the shader itself
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    // what color output to setup -> need one for surface
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE), // replace old pixel data w new
+                    write_mask: wgpu::ColorWrites::ALL,     // write to all color channels
+                })],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                // how to interpret vertex -> triangle conversion
+                topology: wgpu::PrimitiveTopology::TriangleList, // each three vertices = 1 triangle
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw, // triangle is facing forward if vertices are arranged CCW
+                cull_mode: Some(wgpu::Face::Back), // those not arranged CCW are culled
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None, // will change
+            multisample: wgpu::MultisampleState {
+                count: 1, // no multisampling
+                mask: !0,
+                alpha_to_coverage_enabled: false, // anti-aliasing
+            },
+            multiview_mask: None, // needed if rendering to array textures
+            cache: None,          // apparently only useful for Android build targets
+        });
 
         Ok(Self {
             surface,
@@ -94,6 +143,7 @@ impl State {
                 b: 0.3,
                 a: 1.0,
             },
+            render_pipeline,
         })
     }
 
