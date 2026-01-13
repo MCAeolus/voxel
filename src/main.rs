@@ -197,7 +197,7 @@ impl State {
         // the render pass will mutably borrow the encoder. this needs to be released before we can (then) call encoder.finish().
         // by scoping this block, rust will automatically drop all the variables contained inside when the scope is left -> same as calling drop()
         {
-            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -213,6 +213,10 @@ impl State {
                 timestamp_writes: None,
                 multiview_mask: None,
             });
+
+            // pipeline
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.draw(0..3, 0..1); // draw 3 vertices, one instance (this is where @builtin(vertex_index) comes from)
         }
         // submit accepts any impl IntoIter
         self.queue.submit(std::iter::once(encoder.finish()));
